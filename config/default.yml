@@ -5153,8 +5153,9 @@ Style/MultipleComparison:
                  Avoid comparing a variable with multiple items in a conditional,
                  use Array#include? instead.
   Enabled: true
+  SafeAutoCorrect: false
   VersionAdded: '0.49'
-  VersionChanged: '1.1'
+  VersionChanged: '<<next>>'
   AllowMethodComparison: true
   ComparisonsThreshold: 2
 
