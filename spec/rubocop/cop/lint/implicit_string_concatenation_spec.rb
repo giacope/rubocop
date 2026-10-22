@@ -137,6 +137,70 @@ RSpec.describe RuboCop::Cop::Lint::ImplicitStringConcatenation, :config do
     end
   end
 
+  context 'when the string literals are the receiver of a method call' do
+    it 'registers an offense and corrects with parentheses' do
+      expect_offense(<<~RUBY)
+        "abc" "def".upcase
+        ^^^^^^^^^^^ Combine "abc" and "def" into a single string literal, rather than using implicit string concatenation. Or, if they were intended to be separate method arguments, separate them with a comma.
+      RUBY
+
+      expect_correction(<<~RUBY)
+        ("abc" + "def").upcase
+      RUBY
+    end
+
+    it 'registers an offense and corrects with parentheses when there are multiple concatenations' do
+      expect_offense(<<~RUBY)
+        "abc" "def" "ghi".upcase
+              ^^^^^^^^^^^ Combine "def" and "ghi" into a single string literal, rather than using implicit string concatenation. Or, if they were intended to be separate method arguments, separate them with a comma.
+        ^^^^^^^^^^^ Combine "abc" and "def" into a single string literal, rather than using implicit string concatenation. Or, if they were intended to be separate method arguments, separate them with a comma.
+      RUBY
+
+      expect_correction(<<~RUBY)
+        ("abc" + "def" + "ghi").upcase
+      RUBY
+    end
+  end
+
+  context 'when the string literals are the receiver of an operator' do
+    it 'registers an offense and corrects with parentheses' do
+      expect_offense(<<~RUBY)
+        "%s and " "%s" % [a, b]
+        ^^^^^^^^^^^^^^ Combine "%s and " and "%s" into a single string literal, rather than using implicit string concatenation. Or, if they were intended to be separate method arguments, separate them with a comma.
+      RUBY
+
+      expect_correction(<<~RUBY)
+        ("%s and " + "%s") % [a, b]
+      RUBY
+    end
+  end
+
+  context 'when the string literals are the operand of `+`' do
+    it 'registers an offense and corrects with parentheses' do
+      expect_offense(<<~RUBY)
+        base + "abc" "def"
+               ^^^^^^^^^^^ Combine "abc" and "def" into a single string literal, rather than using implicit string concatenation. Or, if they were intended to be separate method arguments, separate them with a comma.
+      RUBY
+
+      expect_correction(<<~RUBY)
+        base + ("abc" + "def")
+      RUBY
+    end
+  end
+
+  context 'when the string literals are the operand of an operator with lower precedence than `+`' do
+    it 'registers an offense and corrects without parentheses' do
+      expect_offense(<<~RUBY)
+        value == "abc" "def"
+                 ^^^^^^^^^^^ Combine "abc" and "def" into a single string literal, rather than using implicit string concatenation. Or, if they were intended to be separate method arguments, separate them with a comma.
+      RUBY
+
+      expect_correction(<<~RUBY)
+        value == "abc" + "def"
+      RUBY
+    end
+  end
+
   context "when in a method call's argument list" do
     it 'notes that the strings could be separated by a comma instead' do
       expect_offense(<<~RUBY)
