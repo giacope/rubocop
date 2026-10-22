@@ -1,0 +1,1 @@
+* [#x](https://github.com/rubocop/rubocop/pull/x): Fix an incorrect autocorrect for `Style/SoleNestedConditional` when the last operand of an `and` is a `not` or a method call without parentheses. ([@giacope][])
