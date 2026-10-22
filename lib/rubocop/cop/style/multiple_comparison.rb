@@ -9,6 +9,13 @@ module RuboCop
       # It accepts comparisons of multiple method calls to avoid unnecessary method calls
       # by default. It can be configured by `AllowMethodComparison` option.
       #
+      # @safety
+      #   This cop's autocorrection is unsafe because `Array#include?` calls `==`
+      #   on each element (`'a' == a`) rather than on the variable (`a == 'a'`).
+      #   The result differs when the variable's `==` is not symmetric with that
+      #   of the compared values, e.g. an object whose `==` also accepts symbols:
+      #   `format == :json` may be true while `[:json].include?(format)` is false.
+      #
       # @example
       #   # bad
       #   a = 'a'
