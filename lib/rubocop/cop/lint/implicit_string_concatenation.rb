@@ -27,19 +27,17 @@ module RuboCop
                     'elements, separate them with a comma.'
         FOR_METHOD = ' Or, if they were intended to be separate method ' \
                      'arguments, separate them with a comma.'
+        # Binary operators that bind at least as tightly as the inserted `+`.
+        PLUS_OR_HIGHER_PRECEDENCE_OPERATORS = %i[+ - * / % **].to_set.freeze
 
-        # rubocop:disable-next Metrics/AbcSize, Metrics/MethodLength, Metrics/PerceivedComplexity
+        # rubocop:disable-next Metrics/AbcSize, Metrics/MethodLength
         def on_dstr(node)
+          parenthesize = requires_parentheses?(node)
+
           each_bad_cons(node) do |lhs_node, rhs_node|
             range = lhs_node.source_range.join(rhs_node.source_range)
-            message = format(MSG, lhs: display_str(lhs_node), rhs: display_str(rhs_node))
-            if node.parent&.array_type?
-              message << FOR_ARRAY
-            elsif node.parent&.send_type?
-              message << FOR_METHOD
-            end
 
-            add_offense(range, message: message) do |corrector|
+            add_offense(range, message: offense_message(node, lhs_node, rhs_node)) do |corrector|
               if lhs_node.value == ''
                 corrector.remove(lhs_node)
               elsif rhs_node.value == ''
@@ -48,12 +46,29 @@ module RuboCop
                 range = lhs_node.source_range.end.join(rhs_node.source_range.begin)
 
                 corrector.replace(range, ' + ')
+                next unless parenthesize
+
+                # Only once, when several pairs of literals are joined.
+                corrector.wrap(node, '(', ')')
+                parenthesize = false
               end
             end
           end
         end
 
         private
+
+        # The literals are joined at parse time, so `"a" "b".upcase` calls
+        # `upcase` on `"ab"`. Joining them with `+` needs parentheses to keep
+        # that grouping when the string is a receiver or a tight operand.
+        def requires_parentheses?(node)
+          parent = node.parent
+          return false unless parent&.call_type?
+
+          node.equal?(parent.receiver) ||
+            (parent.binary_operation? &&
+              PLUS_OR_HIGHER_PRECEDENCE_OPERATORS.include?(parent.method_name))
+        end
 
         def each_bad_cons(node)
           node.children.each_cons(2) do |child_node1, child_node2|
@@ -86,6 +101,16 @@ module RuboCop
 
         def string_literals?(node1, node2)
           string_literal?(node1) && string_literal?(node2)
+        end
+
+        def offense_message(node, lhs_node, rhs_node)
+          message = format(MSG, lhs: display_str(lhs_node), rhs: display_str(rhs_node))
+          if node.parent&.array_type?
+            message << FOR_ARRAY
+          elsif node.parent&.send_type?
+            message << FOR_METHOD
+          end
+          message
         end
 
         def display_str(node)
