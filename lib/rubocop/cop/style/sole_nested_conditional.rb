@@ -214,16 +214,28 @@ module RuboCop
 
         def add_parentheses?(node)
           return true if node.assignment? || node.or_type?
-          return true if assignment_in_and?(node)
+          return true if parenthesize_and?(node)
           return false unless node.call_type?
 
           (node.arguments.any? && !node.parenthesized?) || node.prefix_not?
         end
 
-        def assignment_in_and?(node)
+        def parenthesize_and?(node)
           return false unless node.and_type?
 
-          node.each_descendant.any?(&:assignment?)
+          node.each_descendant.any?(&:assignment?) || loose_last_operand?(node)
+        end
+
+        # The appended `&& inner` would bind into the last operand of an `and`
+        # when it is a `not` or a method call without parentheses.
+        def loose_last_operand?(and_node)
+          last_operand = and_node.rhs
+          last_operand = last_operand.rhs while last_operand.and_type?
+          loose_operand?(last_operand)
+        end
+
+        def loose_operand?(node)
+          node.call_type? && (node.prefix_not? || parenthesize_method?(node))
         end
 
         def parenthesized_method_arguments(node)
@@ -246,7 +258,9 @@ module RuboCop
         def parenthesized_and_clause(node)
           if node.and_type?
             parenthesized_and(node)
-          elsif node.assignment?
+          elsif parenthesize_method?(node)
+            parenthesized_method_arguments(node)
+          elsif node.assignment? || loose_operand?(node)
             "(#{node.source})"
           else
             node.source
