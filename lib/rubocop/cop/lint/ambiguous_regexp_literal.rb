@@ -54,9 +54,7 @@ module RuboCop
         def find_offense_node(node, regexp_receiver)
           return node if first_argument_is_regexp?(node) || !node.parent
 
-          if (node.parent.send_type? && node.receiver) ||
-             method_chain_to_regexp_receiver?(node, regexp_receiver) ||
-             part_of_hash_argument?(node)
+          if offense_node_above?(node, regexp_receiver)
             node = find_offense_node(node.parent, regexp_receiver)
           end
 
@@ -65,6 +63,13 @@ module RuboCop
 
         def first_argument_is_regexp?(node)
           node.send_type? && node.first_argument&.regexp_type?
+        end
+
+        def offense_node_above?(node, regexp_receiver)
+          (node.parent.send_type? && node.receiver) ||
+            method_chain_to_regexp_receiver?(node, regexp_receiver) ||
+            part_of_hash_argument?(node) ||
+            part_of_logical_or_ternary_operand?(node, regexp_receiver)
         end
 
         def method_chain_to_regexp_receiver?(node, regexp_receiver)
@@ -76,6 +81,19 @@ module RuboCop
 
         def part_of_hash_argument?(node)
           node.pair_type? || node.parent.pair_type? || (node.hash_type? && !node.braces?)
+        end
+
+        # The method argument is the whole `&&`, `||` or ternary expression
+        # (e.g. `puts /re/.match?(x) ? 1 : 2`), so the parentheses must go
+        # around it rather than around the arguments of the regexp's method.
+        # Only nodes starting with the regexp are part of that expression;
+        # the method call that takes it as an argument starts before it.
+        def part_of_logical_or_ternary_operand?(node, regexp_receiver)
+          return false unless node.source_range.begin_pos == regexp_receiver.source_range.begin_pos
+
+          [node, node.parent].any? do |candidate|
+            candidate.operator_keyword? || (candidate.if_type? && candidate.ternary?)
+          end
         end
       end
     end

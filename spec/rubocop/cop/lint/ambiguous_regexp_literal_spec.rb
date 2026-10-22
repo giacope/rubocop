@@ -150,6 +150,50 @@ RSpec.describe RuboCop::Cop::Lint::AmbiguousRegexpLiteral, :config do
         RUBY
       end
 
+      it 'registers an offense and corrects when the method chain is the condition of a ternary' do
+        expect_offense(<<~RUBY)
+          puts /pattern/.match?(text) ? 1 : 2
+               ^ Ambiguous regexp literal. Parenthesize the method arguments if it's surely a regexp literal, or add a whitespace to the right of the `/` if it should be a division.
+        RUBY
+
+        expect_correction(<<~RUBY)
+          puts(/pattern/.match?(text) ? 1 : 2)
+        RUBY
+      end
+
+      it 'registers an offense and corrects when the method chain is the left operand of `&&`' do
+        expect_offense(<<~RUBY)
+          puts /pattern/.match?(text) && ok
+               ^ Ambiguous regexp literal. Parenthesize the method arguments if it's surely a regexp literal, or add a whitespace to the right of the `/` if it should be a division.
+        RUBY
+
+        expect_correction(<<~RUBY)
+          puts(/pattern/.match?(text) && ok)
+        RUBY
+      end
+
+      it 'registers an offense and corrects when the method chain is the left operand of nested `&&` and `||`' do
+        expect_offense(<<~RUBY)
+          puts /pattern/.match?(text) && ok || fallback, foo
+               ^ Ambiguous regexp literal. Parenthesize the method arguments if it's surely a regexp literal, or add a whitespace to the right of the `/` if it should be a division.
+        RUBY
+
+        expect_correction(<<~RUBY)
+          puts(/pattern/.match?(text) && ok || fallback, foo)
+        RUBY
+      end
+
+      it 'registers an offense and corrects when the method chain is followed by `and`' do
+        expect_offense(<<~RUBY)
+          puts /pattern/.match?(text) and ok
+               ^ Ambiguous regexp literal. Parenthesize the method arguments if it's surely a regexp literal, or add a whitespace to the right of the `/` if it should be a division.
+        RUBY
+
+        expect_correction(<<~RUBY)
+          puts(/pattern/.match?(text)) and ok
+        RUBY
+      end
+
       it 'registers an offense and corrects when using nested method arguments without parentheses' do
         expect_offense(<<~RUBY)
           puts line.grep /pattern/
